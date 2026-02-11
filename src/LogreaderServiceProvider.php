@@ -22,17 +22,6 @@ class LogreaderServiceProvider extends ServiceProvider
             __DIR__.'/../config/logreader.php' => config_path('logreader.php'),
         ], 'logreader-config');
 
-        $this->publishes([
-            __DIR__.'/../resources/views' => resource_path('views/vendor/logreader'),
-        ], 'logreader-views');
-
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'logreader');
-
         $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
-        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
-
-        if (class_exists(Livewire::class)) {
-            Livewire::component('logreader-log-viewer', LogViewer::class);
-        }
     }
 }
