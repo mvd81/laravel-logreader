@@ -11,5 +11,6 @@ Route::middleware([ValidateLogreaderToken::class, EnsureLogreaderEnabled::class]
     ->group(function () {
         Route::get('/list', [LogreaderController::class, 'list'])->name('list');
         Route::get('/read', [LogreaderController::class, 'read'])->name('read');
+        Route::get('/count', [LogreaderController::class, 'count'])->name('count');
         Route::post('/search', [LogreaderController::class, 'search'])->name('search');
     });

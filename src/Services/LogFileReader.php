@@ -105,6 +105,41 @@ class LogFileReader
         ];
     }
 
+    public function countByLevel(string $path): ?array
+    {
+        $fullPath = $this->getFullPath($path);
+
+        if (!$fullPath || !File::isFile($fullPath) || !$this->isAllowedFile($fullPath)) {
+            return null;
+        }
+
+        // For daily log files (e.g. laravel-2026-02-24.log) the date is in the filename.
+        // For single log files (e.g. laravel.log) we fall back to yesterday's date.
+        $fileName = basename($fullPath);
+        $date = preg_match('/(\d{4}-\d{2}-\d{2})/', $fileName, $m)
+            ? $m[1]
+            : date('Y-m-d', strtotime('yesterday'));
+
+        $contents = File::get($fullPath);
+        $lines = explode("\n", $contents);
+        $counts = [];
+
+        foreach ($lines as $line) {
+            if (!preg_match('/^\[' . preg_quote($date, '/') . ' \d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.(\w+):/i', $line, $matches)) {
+                continue;
+            }
+
+            $level = strtolower($matches[1]);
+            $counts[$level] = ($counts[$level] ?? 0) + 1;
+        }
+
+        return [
+            'path' => $path,
+            'date' => $date,
+            'counts' => $counts,
+        ];
+    }
+
     public function search(string $path, string $query, bool $caseSensitive = false): ?array
     {
         $fullPath = $this->getFullPath($path);
