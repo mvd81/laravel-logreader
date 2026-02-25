@@ -46,18 +46,12 @@ class LogreaderController extends Controller
         return response()->json($result);
     }
 
-    public function count(Request $request): JsonResponse
+    public function count(): JsonResponse
     {
-        $path = $request->query('path');
-
-        if (!$path) {
-            return response()->json(['error' => 'Path is required'], 400);
-        }
-
-        $result = $this->reader->countByLevel($path);
+        $result = $this->reader->countByLevel();
 
         if ($result === null) {
-            return response()->json(['error' => 'Invalid path, not a file, or file type not allowed'], 400);
+            return response()->json(['error' => 'No log file found for yesterday'], 404);
         }
 
         return response()->json($result);

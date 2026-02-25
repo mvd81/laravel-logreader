@@ -105,27 +105,24 @@ class LogFileReader
         ];
     }
 
-    public function countByLevel(string $path): ?array
+    public function countByLevel(): ?array
     {
-        $fullPath = $this->getFullPath($path);
+        $yesterday = date('Y-m-d', strtotime('yesterday'));
 
-        if (!$fullPath || !File::isFile($fullPath) || !$this->isAllowedFile($fullPath)) {
+        // Resolve the correct log file: prefer daily (LOG_STACK=daily), fall back to single
+        $path = $this->resolveLogPath($yesterday);
+
+        if ($path === null) {
             return null;
         }
 
-        // For daily log files (e.g. laravel-2026-02-24.log) the date is in the filename.
-        // For single log files (e.g. laravel.log) we fall back to yesterday's date.
-        $fileName = basename($fullPath);
-        $date = preg_match('/(\d{4}-\d{2}-\d{2})/', $fileName, $m)
-            ? $m[1]
-            : date('Y-m-d', strtotime('yesterday'));
-
+        $fullPath = $this->getFullPath($path);
         $contents = File::get($fullPath);
         $lines = explode("\n", $contents);
         $counts = [];
 
         foreach ($lines as $line) {
-            if (!preg_match('/^\[' . preg_quote($date, '/') . ' \d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.(\w+):/i', $line, $matches)) {
+            if (!preg_match('/^\[' . preg_quote($yesterday, '/') . ' \d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.(\w+):/i', $line, $matches)) {
                 continue;
             }
 
@@ -135,9 +132,21 @@ class LogFileReader
 
         return [
             'path' => $path,
-            'date' => $date,
+            'date' => $yesterday,
             'counts' => $counts,
         ];
+    }
+
+    private function resolveLogPath(string $date): ?string
+    {
+        foreach (["laravel-{$date}.log", 'laravel.log'] as $candidate) {
+            $fullPath = $this->getFullPath($candidate);
+            if ($fullPath && File::isFile($fullPath) && $this->isAllowedFile($fullPath)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     public function search(string $path, string $query, bool $caseSensitive = false): ?array
