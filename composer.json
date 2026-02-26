@@ -1,13 +1,14 @@
 {
     "name": "mvd81/laravel-logreader",
-    "description": "A Laravel package to read and browse log files via a Sanctum-authenticated API",
+    "description": "A Laravel client package to read /search and browse log files for logreader.dev",
     "type": "library",
     "license": "MIT",
     "keywords": [
         "laravel",
         "logs",
-        "log-reader",
-        "log-viewer"
+        "logs search",
+        "log reader",
+        "log viewer"
     ],
     "authors": [
         {
