@@ -1,6 +1,6 @@
 # Laravel Logreader
 
-A Laravel package that exposes your application's log files via a secure API. Install this on your Laravel application to allow the central Logreader app to remotely read its logs.
+This is the client package for [logreader.dev](https://logreader.dev). Install it on your Laravel application to allow the Logreader to remotely read your log files via a secure API.
 
 ## Installation
 
@@ -24,7 +24,7 @@ Add the token you received from the Logreader application to your `.env`:
 LOGREADER_TOKEN=your-token-here
 ```
 
-You can find this token in the Logreader dashboard after registering your application.
+You can find this token in the [logreader.dev](https://logreader.dev) dashboard after registering your application.
 
 ### Options
 
