@@ -3,8 +3,6 @@
 namespace Mvd81\LaravelLogreader;
 
 use Illuminate\Support\ServiceProvider;
-use Livewire\Livewire;
-use Mvd81\LaravelLogreader\Livewire\LogViewer;
 
 class LogreaderServiceProvider extends ServiceProvider
 {
