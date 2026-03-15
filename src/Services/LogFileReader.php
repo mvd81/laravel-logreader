@@ -157,6 +157,11 @@ class LogFileReader
             return null;
         }
 
+        $size = File::size($fullPath);
+        if ($size > self::MAX_FILE_SIZE) {
+            return null;
+        }
+
         $contents = File::get($fullPath);
         $lines = explode("\n", $contents);
         $results = [];
@@ -252,34 +257,17 @@ class LogFileReader
     {
         $filteredLines = [];
         $normalizedType = strtoupper($type);
-        $matchingLogIndices = [];
+        $matchPattern = '/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.' . preg_quote($normalizedType, '/') . ':/i';
+        $anyHeaderPattern = '/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.\w+:/';
+        $collecting = false;
 
-        foreach ($lines as $index => $line) {
-            if (trim($line) === '') {
-                continue;
+        foreach ($lines as $line) {
+            if (preg_match($anyHeaderPattern, $line)) {
+                $collecting = (bool) preg_match($matchPattern, $line);
             }
 
-            if (preg_match('/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.' . preg_quote($normalizedType, '/') . ':/i', $line)) {
-                $matchingLogIndices[] = $index;
-            }
-        }
-
-        foreach ($matchingLogIndices as $logIndex) {
-            $logEndLine = $logIndex;
-            for ($i = $logIndex + 1; $i < count($lines); $i++) {
-                if (trim($lines[$i]) === '') {
-                    $logEndLine = $i;
-                    continue;
-                }
-                if (preg_match('/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.\w+:/', $lines[$i])) {
-                    $logEndLine = $i - 1;
-                    break;
-                }
-                $logEndLine = $i;
-            }
-
-            for ($i = $logIndex; $i <= $logEndLine; $i++) {
-                $filteredLines[] = $lines[$i];
+            if ($collecting) {
+                $filteredLines[] = $line;
             }
         }
 
