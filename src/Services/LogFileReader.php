@@ -7,8 +7,7 @@ use Illuminate\Support\Facades\File;
 class LogFileReader
 {
     private const ALLOWED_ROOT = 'storage/logs';
-    private const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    private const ALLOWED_EXTENSIONS = ['log', 'txt'];
+private const ALLOWED_EXTENSIONS = ['log', 'txt'];
 
     public function list(string $path = ''): ?array
     {
@@ -78,20 +77,27 @@ class LogFileReader
         }
 
         $size = File::size($fullPath);
-        if ($size > self::MAX_FILE_SIZE) {
-            return null;
-        }
-
-        $contents = File::get($fullPath);
-        $lines = explode("\n", $contents);
 
         if ($type) {
-            $lines = $this->filterLogsByType($lines, $type);
-        }
+            // Filtered read: stream line by line, collect only matching lines.
+            $lines = $this->streamFilterLogsByType($fullPath, $type);
+            $totalLines = count($lines);
+            $paginatedLines = array_slice($lines, ($page - 1) * $perPage, $perPage);
+        } else {
+            // Unfiltered read: stream line by line so large files don't exhaust memory.
+            $file = new \SplFileObject($fullPath);
+            $file->seek(PHP_INT_MAX);
+            $totalLines = $file->key() + 1;
 
-        $totalLines = count($lines);
-        $start = ($page - 1) * $perPage;
-        $paginatedLines = array_slice($lines, $start, $perPage);
+            $start = ($page - 1) * $perPage;
+            $file->seek($start);
+
+            $paginatedLines = [];
+            while (!$file->eof() && count($paginatedLines) < $perPage) {
+                $paginatedLines[] = rtrim($file->current(), "\r\n");
+                $file->next();
+            }
+        }
 
         return [
             'path' => $path,
@@ -157,59 +163,55 @@ class LogFileReader
             return null;
         }
 
-        $size = File::size($fullPath);
-        if ($size > self::MAX_FILE_SIZE) {
-            return null;
-        }
-
-        $contents = File::get($fullPath);
-        $lines = explode("\n", $contents);
+        $headerPattern = '/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\s+\w+\.\w+:/';
         $results = [];
-        $foundLogIndices = [];
+        $matchCount = 0;
+        $currentEntry = [];
+        $currentLineNumber = 0;
 
-        foreach ($lines as $lineNumber => $line) {
-            $match = $caseSensitive
-                ? strpos($line, $query) !== false
-                : stripos($line, $query) !== false;
+        $file = new \SplFileObject($fullPath);
+        while (!$file->eof()) {
+            $line = rtrim($file->current(), "\r\n");
+            $lineNumber = $file->key() + 1;
+            $file->next();
 
-            if ($match) {
-                $parentLogIndex = null;
-                for ($i = $lineNumber; $i >= 0; $i--) {
-                    if (preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\s+\w+\.\w+:/', $lines[$i])) {
-                        $parentLogIndex = $i;
-                        break;
+            if (preg_match($headerPattern, $line)) {
+                // Flush previous entry if it had a match
+                if (!empty($currentEntry)) {
+                    $entryText = implode("\n", array_column($currentEntry, 'content'));
+                    $matched = $caseSensitive
+                        ? str_contains($entryText, $query)
+                        : str_contains(mb_strtolower($entryText), mb_strtolower($query));
+
+                    if ($matched && $matchCount < 500) {
+                        array_push($results, ...$currentEntry);
+                        $matchCount++;
                     }
                 }
-
-                if ($parentLogIndex !== null && !in_array($parentLogIndex, $foundLogIndices)) {
-                    $foundLogIndices[] = $parentLogIndex;
-                }
+                $currentEntry = [['line_number' => $lineNumber, 'content' => $line]];
+            } elseif (!empty($currentEntry)) {
+                $currentEntry[] = ['line_number' => $lineNumber, 'content' => $line];
             }
         }
 
-        foreach ($foundLogIndices as $logIndex) {
-            $logEndLine = $logIndex;
-            for ($i = $logIndex + 1; $i < count($lines); $i++) {
-                if (preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\s+\w+\.\w+:/', $lines[$i])) {
-                    $logEndLine = $i - 1;
-                    break;
-                }
-                $logEndLine = $i;
-            }
+        // Flush the last entry
+        if (!empty($currentEntry)) {
+            $entryText = implode("\n", array_column($currentEntry, 'content'));
+            $matched = $caseSensitive
+                ? str_contains($entryText, $query)
+                : str_contains(mb_strtolower($entryText), mb_strtolower($query));
 
-            for ($i = $logIndex; $i <= $logEndLine; $i++) {
-                $results[] = [
-                    'line_number' => $i + 1,
-                    'content' => $lines[$i],
-                ];
+            if ($matched && $matchCount < 500) {
+                array_push($results, ...$currentEntry);
+                $matchCount++;
             }
         }
 
         return [
             'path' => $path,
             'query' => $query,
-            'matches' => count($foundLogIndices),
-            'results' => array_slice($results, 0, 500),
+            'matches' => $matchCount,
+            'results' => $results,
         ];
     }
 
@@ -251,6 +253,31 @@ class LogFileReader
     {
         $extension = strtolower(File::extension($fullPath));
         return in_array($extension, self::ALLOWED_EXTENSIONS);
+    }
+
+    private function streamFilterLogsByType(string $fullPath, string $type): array
+    {
+        $normalizedType = strtoupper($type);
+        $matchPattern = '/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.' . preg_quote($normalizedType, '/') . ':/i';
+        $anyHeaderPattern = '/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.\w+:/';
+        $collecting = false;
+        $filteredLines = [];
+
+        $file = new \SplFileObject($fullPath);
+        while (!$file->eof()) {
+            $line = rtrim($file->current(), "\r\n");
+            $file->next();
+
+            if (preg_match($anyHeaderPattern, $line)) {
+                $collecting = (bool) preg_match($matchPattern, $line);
+            }
+
+            if ($collecting) {
+                $filteredLines[] = $line;
+            }
+        }
+
+        return $filteredLines;
     }
 
     private function filterLogsByType(array $lines, string $type): array
