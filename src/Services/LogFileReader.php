@@ -82,18 +82,21 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
             // Filtered read: stream line by line, collect only matching lines.
             $lines = $this->streamFilterLogsByType($fullPath, $type);
             $totalLines = count($lines);
-            $paginatedLines = array_slice($lines, ($page - 1) * $perPage, $perPage);
+            $start = max(0, $totalLines - $page * $perPage);
+            $end = $totalLines - ($page - 1) * $perPage;
+            $paginatedLines = array_slice($lines, $start, $end - $start);
         } else {
             // Unfiltered read: stream line by line so large files don't exhaust memory.
             $file = new \SplFileObject($fullPath);
             $file->seek(PHP_INT_MAX);
             $totalLines = $file->key() + 1;
 
-            $start = ($page - 1) * $perPage;
+            $start = max(0, $totalLines - $page * $perPage);
+            $end = $totalLines - ($page - 1) * $perPage;
             $file->seek($start);
 
             $paginatedLines = [];
-            while (!$file->eof() && count($paginatedLines) < $perPage) {
+            while (!$file->eof() && count($paginatedLines) < ($end - $start)) {
                 $paginatedLines[] = rtrim($file->current(), "\r\n");
                 $file->next();
             }
