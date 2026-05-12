@@ -57,6 +57,27 @@ class LogreaderController extends Controller
         return response()->json($result);
     }
 
+    public function timeRange(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'path' => 'required|string',
+            'time_from' => 'nullable|string|regex:/^\d{1,2}:\d{2}$/',
+            'time_to' => 'nullable|string|regex:/^\d{1,2}:\d{2}$/',
+        ]);
+
+        $result = $this->reader->searchByTimeRange(
+            $validated['path'],
+            $validated['time_from'] ?? '',
+            $validated['time_to'] ?? '',
+        );
+
+        if ($result === null) {
+            return response()->json(['error' => 'Invalid path, not a file, or file type not allowed'], 400);
+        }
+
+        return response()->json($result);
+    }
+
     public function search(Request $request): JsonResponse
     {
         $validated = $request->validate([

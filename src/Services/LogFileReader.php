@@ -218,6 +218,92 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         ];
     }
 
+    public function searchByTimeRange(string $path, string $timeFrom, string $timeTo): ?array
+    {
+        $fullPath = $this->getFullPath($path);
+
+        if (!$fullPath || !File::isFile($fullPath) || !$this->isAllowedFile($fullPath)) {
+            return null;
+        }
+
+        $fromMinutes = $this->parseTimeToMinutes($timeFrom);
+        $toMinutes = $this->parseTimeToMinutes($timeTo);
+
+        $headerPattern = '/^\[(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2}):\d{2}\]\s+\w+\.\w+:/';
+        $results = [];
+        $matchCount = 0;
+        $currentEntry = [];
+        $currentInRange = false;
+
+        $file = new \SplFileObject($fullPath);
+        while (!$file->eof()) {
+            $line = rtrim($file->current(), "\r\n");
+            $lineNumber = $file->key() + 1;
+            $file->next();
+
+            if (preg_match($headerPattern, $line, $m)) {
+                if ($currentInRange && !empty($currentEntry) && $matchCount < 5000) {
+                    array_push($results, ...$currentEntry);
+                    $matchCount++;
+                }
+
+                $entryMinutes = (int) $m[2] * 60 + (int) $m[3];
+                $currentInRange = $this->isInTimeRange($entryMinutes, $fromMinutes, $toMinutes);
+                $currentEntry = [['line_number' => $lineNumber, 'content' => $line]];
+            } elseif (!empty($currentEntry)) {
+                $currentEntry[] = ['line_number' => $lineNumber, 'content' => $line];
+            }
+        }
+
+        if ($currentInRange && !empty($currentEntry) && $matchCount < 5000) {
+            array_push($results, ...$currentEntry);
+            $matchCount++;
+        }
+
+        return [
+            'path' => $path,
+            'time_from' => $timeFrom,
+            'time_to' => $timeTo,
+            'matches' => $matchCount,
+            'results' => $results,
+        ];
+    }
+
+    private function parseTimeToMinutes(string $time): ?int
+    {
+        if (!preg_match('/^(\d{1,2}):(\d{2})$/', $time, $m)) {
+            return null;
+        }
+
+        $h = (int) $m[1];
+        $min = (int) $m[2];
+
+        if ($h > 23 || $min > 59) {
+            return null;
+        }
+
+        return $h * 60 + $min;
+    }
+
+    private function isInTimeRange(int $minutes, ?int $from, ?int $to): bool
+    {
+        if ($from === null && $to === null) {
+            return true;
+        }
+
+        if ($from !== null && $to !== null) {
+            return $from <= $to
+                ? ($minutes >= $from && $minutes <= $to)
+                : ($minutes >= $from || $minutes <= $to);
+        }
+
+        if ($from !== null) {
+            return $minutes >= $from;
+        }
+
+        return $minutes <= $to;
+    }
+
     private function getFullPath(?string $relativePath): ?string
     {
         if (!$relativePath) {
