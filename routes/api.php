@@ -3,9 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use Mvd81\LaravelLogreader\Http\Controllers\LogreaderController;
 use Mvd81\LaravelLogreader\Http\Middleware\EnsureLogreaderEnabled;
+use Mvd81\LaravelLogreader\Http\Middleware\GzipResponse;
 use Mvd81\LaravelLogreader\Http\Middleware\ValidateLogreaderToken;
 
-Route::middleware([ValidateLogreaderToken::class, EnsureLogreaderEnabled::class])
+Route::middleware([ValidateLogreaderToken::class, EnsureLogreaderEnabled::class, GzipResponse::class])
     ->prefix( 'api/v1/logreader')
     ->name('logreader.')
     ->group(function () {
