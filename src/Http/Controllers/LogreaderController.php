@@ -46,12 +46,16 @@ class LogreaderController extends Controller
         return response()->json($result);
     }
 
-    public function count(): JsonResponse
+    public function count(Request $request): JsonResponse
     {
-        $result = $this->reader->countByLevel();
+        $validated = $request->validate([
+            'date' => 'nullable|date_format:Y-m-d',
+        ]);
+
+        $result = $this->reader->countByLevel($validated['date'] ?? null);
 
         if ($result === null) {
-            return response()->json(['error' => 'No log file found for yesterday'], 404);
+            return response()->json(['error' => 'No log file found for the requested date'], 404);
         }
 
         return response()->json($result);

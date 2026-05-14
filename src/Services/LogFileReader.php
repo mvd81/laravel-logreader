@@ -114,12 +114,12 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         ];
     }
 
-    public function countByLevel(): ?array
+    public function countByLevel(?string $date = null): ?array
     {
-        $yesterday = date('Y-m-d', strtotime('yesterday'));
+        $date ??= date('Y-m-d', strtotime('yesterday'));
 
         // Resolve the correct log file: prefer daily (LOG_STACK=daily), fall back to single
-        $path = $this->resolveLogPath($yesterday);
+        $path = $this->resolveLogPath($date);
 
         if ($path === null) {
             return null;
@@ -131,7 +131,7 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         $counts = [];
 
         foreach ($lines as $line) {
-            if (!preg_match('/^\[' . preg_quote($yesterday, '/') . ' \d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.(\w+):/i', $line, $matches)) {
+            if (!preg_match('/^\[' . preg_quote($date, '/') . ' \d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.(\w+):/i', $line, $matches)) {
                 continue;
             }
 
@@ -141,7 +141,7 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
 
         return [
             'path' => $path,
-            'date' => $yesterday,
+            'date' => $date,
             'counts' => $counts,
         ];
     }
