@@ -50,9 +50,10 @@ class LogreaderController extends Controller
     {
         $validated = $request->validate([
             'date' => 'nullable|date_format:Y-m-d',
+            'path' => 'nullable|string',
         ]);
 
-        $result = $this->reader->countByLevel($validated['date'] ?? null);
+        $result = $this->reader->countByLevel($validated['date'] ?? null, $validated['path'] ?? null);
 
         if ($result === null) {
             return response()->json(['error' => 'No log file found for the requested date'], 404);
