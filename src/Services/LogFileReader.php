@@ -114,12 +114,11 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         ];
     }
 
-    public function countByLevel(?string $date = null): ?array
+    public function countByLevel(?string $date = null, ?string $path = null): ?array
     {
         $date ??= date('Y-m-d', strtotime('yesterday'));
 
-        // Resolve the correct log file: prefer daily (LOG_STACK=daily), fall back to single
-        $path = $this->resolveLogPath($date);
+        $path = $path ?? $this->resolveLogPath($date);
 
         if ($path === null) {
             return null;
@@ -148,10 +147,21 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
 
     private function resolveLogPath(string $date): ?string
     {
-        foreach (["laravel-{$date}.log", 'laravel.log'] as $candidate) {
-            $fullPath = $this->getFullPath($candidate);
-            if ($fullPath && File::isFile($fullPath) && $this->isAllowedFile($fullPath)) {
-                return $candidate;
+        $dated = "laravel-{$date}.log";
+        $fullPath = $this->getFullPath($dated);
+
+        if ($fullPath && File::isFile($fullPath) && $this->isAllowedFile($fullPath)) {
+            return $dated;
+        }
+
+        // Only fall back to laravel.log when the app is configured for single-channel logging.
+        $channel = config('logging.default', 'stack');
+        $driver  = config("logging.channels.{$channel}.driver");
+
+        if ($driver === 'single') {
+            $singlePath = $this->getFullPath('laravel.log');
+            if ($singlePath && File::isFile($singlePath) && $this->isAllowedFile($singlePath)) {
+                return 'laravel.log';
             }
         }
 
