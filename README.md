@@ -33,6 +33,8 @@ You can find this token in the [logreader.dev](https://logreader.dev) dashboard 
 | `enabled` | `LOGREADER_ENABLED` | `true` | Enable or disable the API |
 | `token` | `LOGREADER_TOKEN` | `null` | Token provided by the Logreader app |
 | `exclude_logs` | `LOGREADER_EXCLUDE_LOGS` | `''` | Comma-separated list of files/patterns to exclude |
+| `context.enabled` | `LOGREADER_CONTEXT_ENABLED` | `false` | Add request URL and user ID to every log entry |
+| `context.include_user_id` | `LOGREADER_CONTEXT_USER_ID` | `true` | Include the authenticated user ID in the log context |
 
 To disable the logreader without removing the package:
 
@@ -45,6 +47,32 @@ To exclude specific log files or directories:
 ```env
 LOGREADER_EXCLUDE_LOGS=passwords.log,private/*,*.tmp
 ```
+
+### Request context
+
+When enabled, a global middleware is automatically registered that adds the following to every log entry using `Log::shareContext()`:
+
+| Field | Description |
+| --- | --- |
+| `url` | Full URL of the request |
+| `method` | HTTP method (GET, POST, etc.) |
+| `request_id` | Unique ID per request — use this to group all log entries from a single request |
+| `user_id` | Authenticated user ID (can be disabled separately) |
+
+This makes it easier to correlate log entries with the request and user that caused them when browsing logs in the dashboard.
+
+```env
+LOGREADER_CONTEXT_ENABLED=true
+```
+
+If you want the URL but not the user ID (for privacy reasons), disable user ID logging separately:
+
+```env
+LOGREADER_CONTEXT_ENABLED=true
+LOGREADER_CONTEXT_USER_ID=false
+```
+
+> **Privacy note:** When `LOGREADER_CONTEXT_USER_ID` is enabled, user IDs are written to your log files. User IDs are personal data — make sure your log retention and access policies account for this.
 
 ## License
 

@@ -2,7 +2,9 @@
 
 namespace Mvd81\LaravelLogreader;
 
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
+use Mvd81\LaravelLogreader\Http\Middleware\AddRequestContext;
 
 class LogreaderServiceProvider extends ServiceProvider
 {
@@ -21,5 +23,9 @@ class LogreaderServiceProvider extends ServiceProvider
         ], 'logreader-config');
 
         $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+
+        if (config('logreader.context.enabled')) {
+            $this->app->make(Kernel::class)->pushMiddleware(AddRequestContext::class);
+        }
     }
 }
