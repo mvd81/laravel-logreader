@@ -10,17 +10,10 @@ class AddRequestContext
 {
     public function handle(Request $request, Closure $next)
     {
-        $context = [
-            'url'        => $request->fullUrl(),
-            'method'     => $request->method(),
-            'request_id' => uniqid('req_', true),
-        ];
-
-        if (config('logreader.context.include_user_id', true)) {
-            $context['user_id'] = auth()->id();
-        }
-
-        Log::shareContext($context);
+        Log::shareContext([
+            'url'    => $request->fullUrl(),
+            'method' => $request->method(),
+        ]);
 
         return $next($request);
     }

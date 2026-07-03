@@ -53,16 +53,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | When enabled, a middleware is automatically registered that adds the
-    | current request URL and (optionally) the authenticated user ID to every
-    | log entry via Log::shareContext(). This makes it easier to correlate log
-    | entries with the request and user that caused them.
-    |
-    | Note: enabling include_user_id will write user IDs to your log files.
-    | Treat this as PII and ensure your log retention policy accounts for it.
+    | current request URL and HTTP method to every log entry via
+    | Log::shareContext(). This makes it easier to see which request caused
+    | a log entry.
     |
     */
     'context' => [
         'enabled' => env('LOGREADER_CONTEXT_ENABLED', false),
-        'include_user_id' => env('LOGREADER_CONTEXT_USER_ID', true),
     ],
 ];
