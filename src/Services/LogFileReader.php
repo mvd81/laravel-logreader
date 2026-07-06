@@ -125,12 +125,20 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         }
 
         $fullPath = $this->getFullPath($path);
-        $contents = File::get($fullPath);
-        $lines = explode("\n", $contents);
+
+        if (!$fullPath || !File::isFile($fullPath) || !$this->isAllowedFile($fullPath)) {
+            return null;
+        }
+
+        $pattern = '/^\[' . preg_quote($date, '/') . ' \d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.(\w+):/i';
         $counts = [];
 
-        foreach ($lines as $line) {
-            if (!preg_match('/^\[' . preg_quote($date, '/') . ' \d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.(\w+):/i', $line, $matches)) {
+        $file = new \SplFileObject($fullPath);
+        while (!$file->eof()) {
+            $line = $file->current();
+            $file->next();
+
+            if (!preg_match($pattern, $line, $matches)) {
                 continue;
             }
 

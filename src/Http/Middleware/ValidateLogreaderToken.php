@@ -16,7 +16,7 @@ class ValidateLogreaderToken
             return response()->json(['error' => 'Logreader token not configured'], 403);
         }
 
-        if ($request->bearerToken() !== $token) {
+        if (! hash_equals((string) $token, (string) $request->bearerToken())) {
             return response()->json(['error' => 'Invalid token'], 401);
         }
 
