@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\File;
 class LogFileReader
 {
     private const ALLOWED_ROOT = 'storage/logs';
-private const ALLOWED_EXTENSIONS = ['log', 'txt'];
+    private const ALLOWED_EXTENSIONS = ['log', 'txt'];
+    private const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
 
     public function list(string $path = ''): ?array
     {
@@ -77,6 +78,10 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         }
 
         $size = File::size($fullPath);
+
+        if ($size > self::MAX_FILE_SIZE) {
+            return null;
+        }
 
         if ($type) {
             // Filtered read: stream line by line, collect only matching lines.
@@ -187,11 +192,13 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         $headerPattern = '/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\s+\w+\.\w+:/';
         $results = [];
         $matchCount = 0;
+        $totalLinesCollected = 0;
         $currentEntry = [];
         $currentLineNumber = 0;
+        $limitReached = false;
 
         $file = new \SplFileObject($fullPath);
-        while (!$file->eof()) {
+        while (!$file->eof() && !$limitReached) {
             $line = rtrim($file->current(), "\r\n");
             $lineNumber = $file->key() + 1;
             $file->next();
@@ -207,6 +214,11 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
                     if ($matched && $matchCount < 500) {
                         array_push($results, ...$currentEntry);
                         $matchCount++;
+                        $totalLinesCollected += count($currentEntry);
+
+                        if ($totalLinesCollected >= 50000) {
+                            $limitReached = true;
+                        }
                     }
                 }
                 $currentEntry = [['line_number' => $lineNumber, 'content' => $line]];
@@ -216,7 +228,7 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         }
 
         // Flush the last entry
-        if (!empty($currentEntry)) {
+        if (!empty($currentEntry) && !$limitReached) {
             $entryText = implode("\n", array_column($currentEntry, 'content'));
             $matched = $caseSensitive
                 ? str_contains($entryText, $query)
@@ -250,11 +262,13 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         $headerPattern = '/^\[(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2}):\d{2}\]\s+\w+\.\w+:/';
         $results = [];
         $matchCount = 0;
+        $totalLinesCollected = 0;
         $currentEntry = [];
         $currentInRange = false;
+        $limitReached = false;
 
         $file = new \SplFileObject($fullPath);
-        while (!$file->eof()) {
+        while (!$file->eof() && !$limitReached) {
             $line = rtrim($file->current(), "\r\n");
             $lineNumber = $file->key() + 1;
             $file->next();
@@ -263,6 +277,11 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
                 if ($currentInRange && !empty($currentEntry) && $matchCount < 5000) {
                     array_push($results, ...$currentEntry);
                     $matchCount++;
+                    $totalLinesCollected += count($currentEntry);
+
+                    if ($totalLinesCollected >= 50000) {
+                        $limitReached = true;
+                    }
                 }
 
                 $entryMinutes = (int) $m[2] * 60 + (int) $m[3];
@@ -273,7 +292,7 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
             }
         }
 
-        if ($currentInRange && !empty($currentEntry) && $matchCount < 5000) {
+        if ($currentInRange && !empty($currentEntry) && !$limitReached && $matchCount < 5000) {
             array_push($results, ...$currentEntry);
             $matchCount++;
         }
@@ -337,7 +356,10 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
 
         $fullPath = base_path(self::ALLOWED_ROOT . '/' . $relativePath);
 
-        if (strpos(realpath($fullPath) ?: $fullPath, realpath(base_path(self::ALLOWED_ROOT))) !== 0) {
+        $allowedRoot = realpath(base_path(self::ALLOWED_ROOT));
+        $resolvedPath = realpath($fullPath);
+
+        if (!$allowedRoot || !$resolvedPath || !str_starts_with($resolvedPath, $allowedRoot . DIRECTORY_SEPARATOR)) {
             return null;
         }
 
@@ -387,24 +409,4 @@ private const ALLOWED_EXTENSIONS = ['log', 'txt'];
         return $filteredLines;
     }
 
-    private function filterLogsByType(array $lines, string $type): array
-    {
-        $filteredLines = [];
-        $normalizedType = strtoupper($type);
-        $matchPattern = '/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.' . preg_quote($normalizedType, '/') . ':/i';
-        $anyHeaderPattern = '/^\[\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\]\s+[\w\-]+\.\w+:/';
-        $collecting = false;
-
-        foreach ($lines as $line) {
-            if (preg_match($anyHeaderPattern, $line)) {
-                $collecting = (bool) preg_match($matchPattern, $line);
-            }
-
-            if ($collecting) {
-                $filteredLines[] = $line;
-            }
-        }
-
-        return $filteredLines;
-    }
 }

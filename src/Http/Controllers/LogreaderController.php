@@ -30,7 +30,7 @@ class LogreaderController extends Controller
     {
         $path = $request->query('path');
         $page = (int) $request->query('page', 1);
-        $perPage = (int) $request->query('per_page', 100);
+        $perPage = min((int) $request->query('per_page', 100), 1000);
         $type = $request->query('type');
 
         if (!$path) {
